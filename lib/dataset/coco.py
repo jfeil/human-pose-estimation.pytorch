@@ -50,6 +50,23 @@ class COCODataset(JointsDataset):
 	"skeleton": [
         [16,14],[14,12],[17,15],[15,13],[12,13],[6,12],[7,13], [6,7],[6,8],
         [7,9],[8,10],[9,11],[2,3],[1,2],[1,3],[2,4],[3,5],[4,6],[5,7]]
+
+
+    "keypoints": [
+        0: "Head",
+        1: "Shoulder Left",
+        2: "Shoulder Right",
+        3: "Elbow Left",
+        4: "Hand Left",
+        5: "Elbow Right",
+        6: "Hand Right",
+        7: "Foot Left",
+        8: "Foot Right",
+        9: "Hip",
+        10: "Neck"
+    ],
+    "skeleton": [2, 4],[11,10],[10,8],[1,11],[11,3],[6,7],[11,2],[4,5],[3,6],[10,9]
+
     '''
     def __init__(self, cfg, root, image_set, is_train, transform=None):
         super().__init__(cfg, root, image_set, is_train, transform)
@@ -82,9 +99,9 @@ class COCODataset(JointsDataset):
         self.num_images = len(self.image_set_index)
         logger.info('=> num_images: {}'.format(self.num_images))
 
-        self.num_joints = 17
-        self.flip_pairs = [[1, 2], [3, 4], [5, 6], [7, 8],
-                           [9, 10], [11, 12], [13, 14], [15, 16]]
+        self.num_joints = 11
+
+        self.flip_pairs = [[1, 2], [3, 5], [4, 6], [7, 8]]
         self.parent_ids = None
 
         self.db = self._get_db()
@@ -92,6 +109,8 @@ class COCODataset(JointsDataset):
         if is_train and cfg.DATASET.SELECT_DATA:
             self.db = self.select_data(self.db)
 
+        print(self.db)
+        exit
         logger.info('=> load {} samples'.format(len(self.db)))
 
     def _get_ann_file_keypoint(self):
@@ -164,8 +183,8 @@ class COCODataset(JointsDataset):
             if max(obj['keypoints']) == 0:
                 continue
 
-            joints_3d = np.zeros((self.num_joints, 3), dtype=np.float)
-            joints_3d_vis = np.zeros((self.num_joints, 3), dtype=np.float)
+            joints_3d = np.zeros((self.num_joints, 3), dtype=np.float32)
+            joints_3d_vis = np.zeros((self.num_joints, 3), dtype=np.float32)
             for ipt in range(self.num_joints):
                 joints_3d[ipt, 0] = obj['keypoints'][ipt * 3 + 0]
                 joints_3d[ipt, 1] = obj['keypoints'][ipt * 3 + 1]
@@ -253,9 +272,9 @@ class COCODataset(JointsDataset):
             num_boxes = num_boxes + 1
 
             center, scale = self._box2cs(box)
-            joints_3d = np.zeros((self.num_joints, 3), dtype=np.float)
+            joints_3d = np.zeros((self.num_joints, 3), dtype=np.float32)
             joints_3d_vis = np.ones(
-                (self.num_joints, 3), dtype=np.float)
+                (self.num_joints, 3), dtype=np.float32)
             kpt_db.append({
                 'image': img_name,
                 'center': center,
@@ -368,7 +387,7 @@ class COCODataset(JointsDataset):
             _key_points = np.array([img_kpts[k]['keypoints']
                                     for k in range(len(img_kpts))])
             key_points = np.zeros(
-                (_key_points.shape[0], self.num_joints * 3), dtype=np.float)
+                (_key_points.shape[0], self.num_joints * 3), dtype=np.float32)
 
             for ipt in range(self.num_joints):
                 key_points[:, ipt * 3 + 0] = _key_points[:, ipt, 0]
