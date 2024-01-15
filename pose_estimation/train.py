@@ -9,33 +9,79 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import datetime
+import glob
 import os
 import pprint
+import re
 import shutil
+from operator import itemgetter
 
 import torch
-import torch.nn.parallel
 import torch.backends.cudnn as cudnn
+import torch.nn.parallel
 import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 import torchvision.transforms as transforms
+import yaml
 from tensorboardX import SummaryWriter
+from easydict import EasyDict as edict
+import mlflow
 
 import _init_paths
 from core.config import config
-from core.config import update_config
-from core.config import update_dir
 from core.config import get_model_name
-from core.loss import JointsMSELoss
+from core.config import update_config
 from core.function import train
 from core.function import validate
+from core.loss import JointsMSELoss
+from utils.dataset import init_paths, create_subset
+from utils.utils import create_logger
 from utils.utils import get_optimizer
 from utils.utils import save_checkpoint
-from utils.utils import create_logger
 
 import dataset
 import models
+
+
+def prepare_training_set(dataset_dir, train_set, val_set, temp_path):
+    dataset_files = {}
+    for mode in ['train', 'val']:
+        for file in glob.glob(os.path.join(dataset_dir, mode, '*.zip')):
+            dataset_files[int(re.search('task_dji_[0-9]{4}', file).group().replace('task_dji_', ''))] = file
+
+    test_set = glob.glob(os.path.join(dataset_dir, 'test', '*.zip'))
+    val_set = itemgetter(*val_set)(dataset_files)
+    if type(val_set) is not tuple:
+        val_set = (val_set,)
+    train_set = itemgetter(*train_set)(dataset_files)
+    if type(train_set) is not tuple:
+        train_set = (train_set,)
+
+    init_paths(os.path.join(temp_path, 'annotations'))
+    create_subset(train_set, temp_path, 'train')
+    create_subset(val_set, temp_path, 'val')
+    create_subset(test_set, temp_path, 'test', output_base_name='image_info_')
+
+
+def prepare_config(temp_path, experiment_output_path, default_config_path, dataset_params,
+                   train_params):
+    with open(default_config_path) as file:
+        config = yaml.safe_load(file.read())
+    _, config_name = os.path.split(default_config_path)
+    config_name, config_ext = os.path.splitext(config_name)
+    exp_config_path = os.path.join(temp_path,
+                                   f"{config_name}_{str(datetime.datetime.now()).replace(' ', '_')}{config_ext}")
+    config['DATASET']['ROOT'] = os.path.abspath(temp_path)
+    config['OUTPUT_DIR'] = os.path.abspath(experiment_output_path)
+
+    if dataset_params and type(dataset_params) is dict:
+        config['DATASET'].update(dataset_params)
+    if train_params and type(train_params) is dict:
+        config['TRAIN'].update(train_params)
+
+    return exp_config_path, config['DATASET'], config['TRAIN']
 
 
 def parse_args():
@@ -47,8 +93,6 @@ def parse_args():
                         type=str)
 
     args, rest = parser.parse_known_args()
-    # update config
-    update_config(args.cfg)
 
     # training
     parser.add_argument('--frequent',
@@ -74,8 +118,9 @@ def reset_config(config, args):
         config.WORKERS = args.workers
 
 
-def main():
-    args = parse_args()
+def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_workers=4, enable_mlflow=False):
+    update_config(cfg_path)
+    args = edict({'cfg': cfg_path, 'frequent': print_frequence, 'gpus': gpus, 'workers': num_workers})
     reset_config(config, args)
 
     logger, final_output_dir, tb_log_dir = create_logger(
@@ -89,15 +134,14 @@ def main():
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
-    model = eval('models.'+config.MODEL.NAME+'.get_pose_net')(
+    model = eval('models.' + config.MODEL.NAME + '.get_pose_net')(
         config, is_train=True
     )
 
     # copy model file
     this_dir = os.path.dirname(__file__)
-    shutil.copy2(
-        os.path.join(this_dir, '../lib/models', config.MODEL.NAME + '.py'),
-        final_output_dir)
+    shutil.copy2(os.path.join(this_dir, '../lib/models', config.MODEL.NAME + '.py'),
+                 final_output_dir)
 
     writer_dict = {
         'writer': SummaryWriter(log_dir=tb_log_dir),
@@ -109,7 +153,7 @@ def main():
                              3,
                              config.MODEL.IMAGE_SIZE[1],
                              config.MODEL.IMAGE_SIZE[0]))
-    writer_dict['writer'].add_graph(model, (dump_input, ), verbose=False)
+    writer_dict['writer'].add_graph(model, (dump_input,), verbose=False)
 
     gpus = [int(i) for i in config.GPUS.split(',')]
     model = torch.nn.DataParallel(model, device_ids=gpus).cuda()
@@ -128,7 +172,7 @@ def main():
     # Data loading code
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
-    train_dataset = eval('dataset.'+config.DATASET.DATASET)(
+    train_dataset = eval('dataset.' + config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
         config.DATASET.TRAIN_SET,
@@ -138,7 +182,7 @@ def main():
             normalize,
         ])
     )
-    valid_dataset = eval('dataset.'+config.DATASET.DATASET)(
+    valid_dataset = eval('dataset.' + config.DATASET.DATASET)(
         config,
         config.DATASET.ROOT,
         config.DATASET.TEST_SET,
@@ -151,14 +195,14 @@ def main():
 
     train_loader = torch.utils.data.DataLoader(
         train_dataset,
-        batch_size=config.TRAIN.BATCH_SIZE*len(gpus),
+        batch_size=config.TRAIN.BATCH_SIZE * len(gpus),
         shuffle=config.TRAIN.SHUFFLE,
         num_workers=config.WORKERS,
         pin_memory=True
     )
     valid_loader = torch.utils.data.DataLoader(
         valid_dataset,
-        batch_size=config.TEST.BATCH_SIZE*len(gpus),
+        batch_size=config.TEST.BATCH_SIZE * len(gpus),
         shuffle=False,
         num_workers=config.WORKERS,
         pin_memory=True
@@ -173,7 +217,6 @@ def main():
         train(config, train_loader, model, criterion, optimizer, epoch,
               final_output_dir, tb_log_dir, writer_dict)
 
-
         # evaluate on validation set
         perf_indicator = validate(config, valid_loader, valid_dataset, model,
                                   criterion, final_output_dir, tb_log_dir,
@@ -184,6 +227,11 @@ def main():
             best_model = True
         else:
             best_model = False
+
+        if enable_mlflow:
+            metrics = ['train_loss', 'train_acc', 'valid_loss', 'valid_acc']
+            for metric in metrics:
+                mlflow.log_metric(metric, writer_dict[metric])
 
         logger.info('=> saving checkpoint to {}'.format(final_output_dir))
         save_checkpoint({
@@ -200,6 +248,11 @@ def main():
         final_model_state_file))
     torch.save(model.module.state_dict(), final_model_state_file)
     writer_dict['writer'].close()
+
+
+def main():
+    args = parse_args()
+    train_loop(args.cfg, args.frequent, args.gpus, args.workers)
 
 
 if __name__ == '__main__':

@@ -77,6 +77,8 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
 
             writer = writer_dict['writer']
             global_steps = writer_dict['train_global_steps']
+            writer_dict['train_loss'] = losses.val
+            writer_dict['train_acc'] = acc.val
             writer.add_scalar('train_loss', losses.val, global_steps)
             writer.add_scalar('train_acc', acc.val, global_steps)
             writer_dict['train_global_steps'] = global_steps + 1
@@ -191,6 +193,8 @@ def validate(config, val_loader, val_dataset, model, criterion, output_dir,
         if writer_dict:
             writer = writer_dict['writer']
             global_steps = writer_dict['valid_global_steps']
+            writer_dict['valid_loss'] = losses.avg
+            writer_dict['valid_acc'] = acc.avg
             writer.add_scalar('valid_loss', losses.avg, global_steps)
             writer.add_scalar('valid_acc', acc.avg, global_steps)
             if isinstance(name_values, list):
