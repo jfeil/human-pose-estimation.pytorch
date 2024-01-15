@@ -41,6 +41,7 @@ class JointsDataset(Dataset):
 
         self.scale_factor = cfg.DATASET.SCALE_FACTOR
         self.rotation_factor = cfg.DATASET.ROT_FACTOR
+        self.saturation_factor = cfg.DATASET.SAT_FACTOR
         self.flip = cfg.DATASET.FLIP
 
         self.image_size = cfg.MODEL.IMAGE_SIZE
@@ -90,7 +91,9 @@ class JointsDataset(Dataset):
         if self.is_train:
             sf = self.scale_factor
             rf = self.rotation_factor
+            saturation_factor = self.saturation_factor
             s = s * np.clip(np.random.randn()*sf + 1, 1 - sf, 1 + sf)
+            saturation = np.clip(np.random.randn()*saturation_factor + 1, 1 - saturation_factor, 1 + saturation_factor)
             r = np.clip(np.random.randn()*rf, -rf*2, rf*2) \
                 if random.random() <= 0.6 else 0
 
@@ -99,6 +102,10 @@ class JointsDataset(Dataset):
                 joints, joints_vis = fliplr_joints(
                     joints, joints_vis, data_numpy.shape[1], self.flip_pairs)
                 c[0] = data_numpy.shape[1] - c[0] - 1
+            
+            h_channel, s_channel, v_channel = cv2.split(cv2.cvtColor(data_numpy, cv2.COLOR_BGR2HSV))
+            s_channel = cv2.multiply(s_channel, saturation).astype(np.uint8)
+            data_numpy = cv2.cvtColor(cv2.merge([h_channel, s_channel, v_channel]), cv2.COLOR_HSV2BGR)
 
         trans = get_affine_transform(c, s, r, self.image_size)
         input = cv2.warpAffine(
