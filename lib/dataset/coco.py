@@ -53,17 +53,16 @@ class COCODataset(JointsDataset):
 
 
     "keypoints": [
-        0: "Head",
-        1: "Shoulder Left",
-        2: "Shoulder Right",
-        3: "Elbow Left",
-        4: "Hand Left",
-        5: "Elbow Right",
-        6: "Hand Right",
-        7: "Foot Left",
-        8: "Foot Right",
-        9: "Hip",
-        10: "Neck"
+        0: "Shoulder Left",
+        1: "Shoulder Right",
+        2: "Elbow Left",
+        3: "Hand Left",
+        4: "Elbow Right",
+        5: "Hand Right",
+        6: "Foot Left",
+        7: "Foot Right",
+        8: "Hip",
+        9: "Neck"
     ],
     "skeleton": [2, 4],[11,10],[10,8],[1,11],[11,3],[6,7],[11,2],[4,5],[3,6],[10,9]
 
@@ -99,9 +98,9 @@ class COCODataset(JointsDataset):
         self.num_images = len(self.image_set_index)
         logger.info('=> num_images: {}'.format(self.num_images))
 
-        self.num_joints = 11
+        self.num_joints = 10
 
-        self.flip_pairs = [[1, 2], [3, 5], [4, 6], [7, 8]]
+        self.flip_pairs = [[0, 1], [2, 4], [3, 5], [6, 7]]
         self.parent_ids = None
 
         self.db = self._get_db()
@@ -109,8 +108,6 @@ class COCODataset(JointsDataset):
         if is_train and cfg.DATASET.SELECT_DATA:
             self.db = self.select_data(self.db)
 
-        print(self.db)
-        exit
         logger.info('=> load {} samples'.format(len(self.db)))
 
     def _get_ann_file_keypoint(self):
@@ -232,7 +229,7 @@ class COCODataset(JointsDataset):
 
     def image_path_from_index(self, index):
         """ example: images / train2017 / 000000119993.jpg """
-        file_name = '%012d.jpg' % index
+        file_name = '%012d.png' % index
         if '2014' in self.image_set:
             file_name = 'COCO_%s_' % self.image_set + file_name
 
