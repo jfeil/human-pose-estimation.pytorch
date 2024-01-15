@@ -291,7 +291,14 @@ class PoseResNet(nn.Module):
             else:
                 raise RuntimeError(
                     'No state_dict found in checkpoint file {}'.format(pretrained))
-            self.load_state_dict(state_dict, strict=False)
+            orig_state_dict = self.state_dict()
+            new_state_dict = self.state_dict()
+            for x in orig_state_dict:
+                if x not in state_dict:
+                    continue
+                if orig_state_dict[x].shape == state_dict[x].shape:
+                    new_state_dict[x] = state_dict[x]            
+            self.load_state_dict(new_state_dict, strict=False)
         else:
             logger.error('=> imagenet pretrained model dose not exist')
             logger.error('=> please download it first')
