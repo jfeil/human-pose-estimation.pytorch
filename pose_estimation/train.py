@@ -134,12 +134,6 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
     args = edict({'cfg': cfg_path, 'frequent': print_frequence, 'gpus': gpus, 'workers': num_workers})
     reset_config(config, args)
 
-    if enable_mlflow:
-        mlflow.log_params(remove_keys(dict(config['DATASET']), ['DATASET', 'ROOT', 'DATA_FORMAT', 'TEST_SET', 'TRAIN_SET']))
-        mlflow.log_params(remove_keys(dict(config['TRAIN']), []))
-        mlflow.log_artifact(cfg_path)
-
-
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
 
@@ -227,6 +221,13 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
 
     best_perf = 0.0
     best_model = False
+
+    if enable_mlflow:
+        mlflow.log_params(remove_keys(dict(config['DATASET']), ['DATASET', 'ROOT', 'DATA_FORMAT', 'TEST_SET', 'TRAIN_SET']))
+        mlflow.log_params(remove_keys(dict(config['TRAIN']), []))
+        mlflow.log_artifact(cfg_path)
+        mlflow.log_param('lr_scheduler', lr_scheduler.__class__.__name__)
+
     for epoch in range(config.TRAIN.BEGIN_EPOCH, config.TRAIN.END_EPOCH):
         lr_scheduler.step()
 
@@ -246,6 +247,7 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
             best_model = False
 
         if enable_mlflow:
+            mlflow.log_metric('learning_rate', lr_scheduler.get_last_lr()[0], step=epoch)
             metrics = ['train_loss', 'train_acc', 'valid_loss', 'valid_acc']
             for metric in metrics:
                 mlflow.log_metric(metric, writer_dict[metric], step=epoch)
