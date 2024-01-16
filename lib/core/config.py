@@ -82,6 +82,7 @@ config.TRAIN = edict()
 config.TRAIN.LR_FACTOR = 0.1
 config.TRAIN.LR_STEP = [90, 110]
 config.TRAIN.LR = 0.001
+config.TRAIN.FREEZE_EPOCHS = 0
 
 config.TRAIN.OPTIMIZER = 'adam'
 config.TRAIN.MOMENTUM = 0.9

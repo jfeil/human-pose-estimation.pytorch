@@ -35,10 +35,20 @@ def train(config, train_loader, model, criterion, optimizer, epoch,
     # switch to train mode
     model.train()
 
+    if config.TRAIN.FREEZE_EPOCHS > 0:
+        parameters = list(model.parameters())
+        for param in parameters[:-1]:
+            param.requires_grad = False
+
     end = time.time()
     for i, (input, target, target_weight, meta) in enumerate(train_loader):
         # measure data loading time
         data_time.update(time.time() - end)
+
+        if config.TRAIN.FREEZE_EPOCHS is i:
+            parameters = list(model.parameters())
+            for param in parameters[:-1]:
+                param.requires_grad = True
 
         # compute output
         output = model(input)
