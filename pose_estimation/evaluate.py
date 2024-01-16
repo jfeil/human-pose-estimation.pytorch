@@ -8,6 +8,10 @@ import glob
 import torch
 import mlflow
 from tqdm.notebook import tqdm
+import ipywidgets as widgets
+from IPython.display import display
+from matplotlib import pyplot as plt
+import cv2
 
 import _init_paths
 import dataset
@@ -144,3 +148,85 @@ def evaluate_run(run_id, test_loader, temp_path='tmp'):
         results += [eval_model(weight, test_loader)]
     shutil.rmtree(temp_path)
     return results
+
+
+def upload_test_results(run_id, test_loader, temp_path='tmp', dry_run=False):
+    results = evaluate_run(run_id, test_loader, temp_path)
+    upload_dict = {}
+    for prefix, result in zip(['model_best', 'final_state'], results):
+        for key in result[0][0]:
+            upload_dict[f"{prefix} {key.replace('(', '').replace(')', '')}"] = result[0][0][key]
+    if not dry_run:
+        with mlflow.start_run(run_id):
+            mlflow.log_metrics(upload_dict)
+    else:
+        print(upload_dict)
+
+
+class DisplayResults:
+
+    def __init__(self, run_id, test_loader, temp_path='tmp', dry_run_results=None, frame_size=100):
+        if not dry_run_results:
+            self.results = evaluate_run(run_id, test_loader, temp_path)
+        else:
+            self.results = dry_run_results
+        self.current_frame = 0
+        self.total_frames = len(self.results[0][3])
+        self.frame_size = frame_size
+
+        # Text field widget
+        self.text = widgets.Text(value=str(self.current_frame), description='Frame:')
+        self.text.observe(self.on_frame_number_change, names='value')
+        
+        # Forward and backward buttons
+        self.button_backward = widgets.Button(description='Backward')
+        self.button_forward = widgets.Button(description='Forward')
+        self.button_backward.on_click(self.on_backward_click)
+        self.button_forward.on_click(self.on_forward_click)
+
+    def display_fig(self):
+        self.fig, self.ax = plt.subplots(1, 2)
+        self.flat_axs = self.ax.flatten()
+        self.update_display()
+
+    def display_buttons(self):
+        # Display widgets
+        display(widgets.HBox([self.button_backward, self.text, self.button_forward]))
+
+    
+    # Function to handle frame number change
+    def on_frame_number_change(self, change):
+        new_frame = int(change.new)
+        if new_frame >= 0 and new_frame < self.total_frames:
+            self.current_frame = new_frame
+            self.update_display()
+    
+    # Function to handle forward button click
+    def on_forward_click(self, b):
+        if self.current_frame < self.total_frames - 1:
+            self.current_frame += 1
+            self.update_display()
+    
+    # Function to handle backward button click
+    def on_backward_click(self, b):
+        if self.current_frame > 0:
+            self.current_frame -= 1
+            self.update_display()
+    
+    # Function to update display based on current_frame value
+    def update_display(self):
+        self.text.value = str(self.current_frame)
+        # Add your code to display the frame based on the current_frame value
+        # For demonstration, printing the current frame
+        frame = cv2.imread(self.results[0][3][self.current_frame])
+        for index, res in enumerate(self.results):
+            all_preds = res[1]
+            frame_new = draw_skeleton(frame, all_preds[self.current_frame])
+            x,y = self.results[index][2][self.current_frame][0:2]
+            x = int(x)
+            y = int(y)
+        
+            frame_new = frame_new[:, :, ::-1]
+            
+            self.flat_axs[index].imshow(frame_new[max(0, y-self.frame_size):min(2160, y+self.frame_size),max(0,x-self.frame_size):min(3840,x+self.frame_size),:])
+        self.fig.canvas.draw()
