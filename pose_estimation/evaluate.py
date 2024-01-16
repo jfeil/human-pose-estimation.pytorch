@@ -140,20 +140,21 @@ def evaluate_run(run_id, test_loader, temp_path='tmp'):
     assert len(config_file) == 1
     config_file = config_file[0]
     
-    weights = glob.glob(f"{temp_path}/*.pth.tar")
-    assert len(weights) == 2
+    weight_paths = glob.glob(f"{temp_path}/*.pth.tar")
+    prefixes = [os.path.split(path)[1].replace('.pth.tar', '') for path in weight_paths]
     results = []
-    for weight in tqdm(weights, desc="Models"):
+
+    for weight in tqdm(weight_paths, desc="Models"):
         upload_dict = {}
         results += [eval_model(weight, test_loader)]
     shutil.rmtree(temp_path)
-    return results
+    return prefixes, results
 
 
 def upload_test_results(run_id, test_loader, temp_path='tmp', dry_run=False):
-    results = evaluate_run(run_id, test_loader, temp_path)
+    prefixes, results = evaluate_run(run_id, test_loader, temp_path)
     upload_dict = {}
-    for prefix, result in zip(['model_best', 'final_state'], results):
+    for prefix, result in zip(prefixes, results):
         for key in result[0][0]:
             upload_dict[f"{prefix} {key.replace('(', '').replace(')', '')}"] = result[0][0][key]
     if not dry_run:
@@ -167,7 +168,7 @@ class DisplayResults:
 
     def __init__(self, run_id, test_loader, temp_path='tmp', dry_run_results=None, frame_size=100):
         if not dry_run_results:
-            self.results = evaluate_run(run_id, test_loader, temp_path)
+            _, self.results = evaluate_run(run_id, test_loader, temp_path)
         else:
             self.results = dry_run_results
         self.current_frame = 0
