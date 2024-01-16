@@ -45,6 +45,13 @@ import dataset
 import models
 
 
+def remove_keys(dict_, keys):
+    for key in keys:
+        if key in dict_:
+            dict_.pop(key)
+    return dict_
+
+
 def prepare_training_set(dataset_dir, train_set, val_set, temp_path):
     dataset_files = {}
     for mode in ['train', 'val']:
@@ -67,6 +74,7 @@ def prepare_training_set(dataset_dir, train_set, val_set, temp_path):
 
 def prepare_config(temp_path, experiment_output_path, default_config_path, dataset_params,
                    train_params):
+
     with open(default_config_path) as file:
         config = yaml.safe_load(file.read())
     _, config_name = os.path.split(default_config_path)
@@ -81,7 +89,10 @@ def prepare_config(temp_path, experiment_output_path, default_config_path, datas
     if train_params and type(train_params) is dict:
         config['TRAIN'].update(train_params)
 
-    return exp_config_path, config['DATASET'], config['TRAIN']
+    with open(exp_config_path, 'w+') as file:
+        yaml.safe_dump(config, file)
+
+    return exp_config_path
 
 
 def parse_args():
@@ -122,6 +133,12 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
     update_config(cfg_path)
     args = edict({'cfg': cfg_path, 'frequent': print_frequence, 'gpus': gpus, 'workers': num_workers})
     reset_config(config, args)
+
+    if enable_mlflow:
+        mlflow.log_params(remove_keys(dict(config['DATASET']), ['DATASET', 'ROOT', 'DATA_FORMAT', 'TEST_SET', 'TRAIN_SET']))
+        mlflow.log_params(remove_keys(dict(config['TRAIN']), []))
+        mlflow.log_artifact(cfg_path)
+
 
     logger, final_output_dir, tb_log_dir = create_logger(
         config, args.cfg, 'train')
@@ -231,7 +248,7 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
         if enable_mlflow:
             metrics = ['train_loss', 'train_acc', 'valid_loss', 'valid_acc']
             for metric in metrics:
-                mlflow.log_metric(metric, writer_dict[metric])
+                mlflow.log_metric(metric, writer_dict[metric], step=epoch)
 
         logger.info('=> saving checkpoint to {}'.format(final_output_dir))
         save_checkpoint({
@@ -243,10 +260,15 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
         }, best_model, final_output_dir)
 
     final_model_state_file = os.path.join(final_output_dir,
-                                          'final_state.pth.tar')
+                                          'final_state.pth.tar')    
     logger.info('saving final model state to {}'.format(
         final_model_state_file))
     torch.save(model.module.state_dict(), final_model_state_file)
+
+    if enable_mlflow:
+        mlflow.log_artifact(os.path.join(final_output_dir, 'final_state.pth.tar'))
+        mlflow.log_artifact(os.path.join(final_output_dir, 'model_best.pth.tar'))
+    
     writer_dict['writer'].close()
 
 
