@@ -117,6 +117,10 @@ def parse_args():
                         help='num of dataloader workers',
                         type=int)
 
+    parser.add_argument('--mlflow-run',
+                        default=None,
+                        type=str)
+
     args = parser.parse_args()
 
     return args
@@ -129,7 +133,12 @@ def reset_config(config, args):
         config.WORKERS = args.workers
 
 
-def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_workers=4, enable_mlflow=False):
+def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_workers=4, mlflow_run=None):
+    print(mlflow_run)
+
+    if mlflow_run:
+        mlflow.start_run(run_id=mlflow_run)
+    
     update_config(cfg_path)
     args = edict({'cfg': cfg_path, 'frequent': print_frequence, 'gpus': gpus, 'workers': num_workers})
     reset_config(config, args)
@@ -222,7 +231,7 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
     best_perf = 0.0
     best_model = False
 
-    if enable_mlflow:
+    if mlflow_run:
         mlflow.log_params(remove_keys(dict(config['DATASET']), ['DATASET', 'ROOT', 'DATA_FORMAT', 'TEST_SET', 'TRAIN_SET']))
         mlflow.log_params(remove_keys(dict(config['TRAIN']), []))
         mlflow.log_artifact(cfg_path)
@@ -246,7 +255,7 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
         else:
             best_model = False
 
-        if enable_mlflow:
+        if mlflow_run:
             mlflow.log_metric('learning_rate', lr_scheduler.get_last_lr()[0], step=epoch)
             metrics = ['train_loss', 'train_acc', 'valid_loss', 'valid_acc']
             for metric in metrics:
@@ -267,16 +276,19 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
         final_model_state_file))
     torch.save(model.module.state_dict(), final_model_state_file)
 
-    if enable_mlflow:
-        mlflow.log_artifact(os.path.join(final_output_dir, 'final_state.pth.tar'))
-        mlflow.log_artifact(os.path.join(final_output_dir, 'model_best.pth.tar'))
-    
+    if mlflow_run:
+        if os.path.exists(os.path.join(final_output_dir, 'final_state.pth.tar')):
+            mlflow.log_artifact(os.path.join(final_output_dir, 'final_state.pth.tar'))
+        if os.path.exists(os.path.join(final_output_dir, 'model_best.pth.tar')):
+            mlflow.log_artifact(os.path.join(final_output_dir, 'model_best.pth.tar'))
+        mlflow.end_run
+
     writer_dict['writer'].close()
 
 
 def main():
     args = parse_args()
-    train_loop(args.cfg, args.frequent, args.gpus, args.workers)
+    train_loop(args.cfg, args.frequent, args.gpus, args.workers, args.mlflow_run)
 
 
 if __name__ == '__main__':
