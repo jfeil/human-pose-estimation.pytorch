@@ -168,7 +168,7 @@ class DisplayResults:
 
     def __init__(self, run_id, test_loader, temp_path='tmp', dry_run_results=None, frame_size=100):
         if not dry_run_results:
-            _, self.results = evaluate_run(run_id, test_loader, temp_path)
+            self.prefix, self.results = evaluate_run(run_id, test_loader, temp_path)
         else:
             self.results = dry_run_results
         self.current_frame = 0
@@ -188,6 +188,8 @@ class DisplayResults:
     def display_fig(self):
         self.fig, self.ax = plt.subplots(1, 2)
         self.flat_axs = self.ax.flatten()
+        for i in range(len(self.prefix)):
+            self.flat_axs[i].set_title(self.prefix[i])
         self.update_display()
 
     def display_buttons(self):

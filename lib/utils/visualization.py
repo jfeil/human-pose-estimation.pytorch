@@ -31,14 +31,23 @@ colors = [
     center_color
 ]
 
-def draw_skeleton(frame, pred, skeleton=[[0,2],[9,8],[8,6],[9,1],[4,5],[9,0],[2,3],[1,4],[8,7]]):
+
+def draw_skeleton(frame, pred, threshold=0.5, skeleton=[[0,2],[9,8],[8,6],[9,1],[4,5],[9,0],[2,3],[1,4],[8,7]]):
     frame = copy(frame)
     centers = [(int(point[0]), int(point[1])) for point in pred]
+    scores = [point[2] for point in pred]
     for i, point in enumerate(centers):
-        frame = cv2.circle(frame, point, 2, colors[i])
+        if scores[i] > threshold:
+            frame = cv2.circle(frame, point, 2, colors[i])
+            # frame = cv2.putText(frame, f"{int(scores[i]*100)}%", point, cv2.FONT_HERSHEY_COMPLEX_SMALL, 0.5, (0, 0, 255), 1, cv2.LINE_AA)
     for p1, p2 in skeleton:
-        frame = cv2.line(frame, centers[p1], centers[p2], 0)
+        if scores[p1] > threshold and scores[p2] > threshold:
+            color = [0, 0, 0]
+        else:
+            color = [255, 255, 255]
+        frame = cv2.line(frame, centers[p1], centers[p2], color)
     return frame
+
 
 def draw_rectangle(frame, pred):
     x, y, w, h, = pred
