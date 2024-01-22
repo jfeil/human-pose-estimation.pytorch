@@ -16,6 +16,7 @@ import pprint
 import re
 import shutil
 from operator import itemgetter
+import random
 
 import torch
 import torch.backends.cudnn as cudnn
@@ -28,6 +29,7 @@ import yaml
 from tensorboardX import SummaryWriter
 from easydict import EasyDict as edict
 import mlflow
+import numpy as np
 
 import _init_paths
 from core.config import config
@@ -73,7 +75,7 @@ def prepare_training_set(dataset_dir, train_set, val_set, temp_path):
 
 
 def prepare_config(temp_path, experiment_output_path, default_config_path, dataset_params,
-                   train_params):
+                   train_params, deterministic=False):
 
     with open(default_config_path) as file:
         config = yaml.safe_load(file.read())
@@ -88,6 +90,8 @@ def prepare_config(temp_path, experiment_output_path, default_config_path, datas
         config['DATASET'].update(dataset_params)
     if train_params and type(train_params) is dict:
         config['TRAIN'].update(train_params)
+    if deterministic:
+        config['CUDNN']['DETERMINISTIC'] = True
 
     with open(exp_config_path, 'w+') as file:
         yaml.safe_dump(config, file)
@@ -152,6 +156,11 @@ def train_loop(cfg_path, print_frequence=config.PRINT_FREQ, gpus='0', num_worker
     # cudnn related setting
     cudnn.benchmark = config.CUDNN.BENCHMARK
     torch.backends.cudnn.deterministic = config.CUDNN.DETERMINISTIC
+    torch.use_deterministic_algorithms(config.CUDNN.DETERMINISTIC)
+    if config.CUDNN.DETERMINISTIC:
+        torch.manual_seed(0)
+        random.seed(0)
+        np.random.seed(0)
     torch.backends.cudnn.enabled = config.CUDNN.ENABLED
 
     model = eval('models.' + config.MODEL.NAME + '.get_pose_net')(

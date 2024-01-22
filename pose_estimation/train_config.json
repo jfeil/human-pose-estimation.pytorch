@@ -1,0 +1,33 @@
+{
+  "training_data": [
+    {"train_set": [80, 68, 176, 82, 71, 87], "val_set": [81]}
+  ],
+  "training_experiments": {
+    "2": [
+      [{}, {"FREEZE_EPOCHS": 0}],
+      [{}, {"FREEZE_EPOCHS": 1}],
+      [{}, {"FREEZE_EPOCHS": 2}],
+      [{}, {"FREEZE_EPOCHS": 4}],
+      [{}, {"FREEZE_EPOCHS": 10}]
+    ],
+    "3": [
+      [{}, {"LR_STEP": [20, 40, 60, 80]}],
+      [{}, {"LR_STEP": [90, 120]}],
+      [{}, {"LR_STEP": [60, 80]}],
+      [{}, {"LR_STEP": [5, 10, 20, 30]}],
+      [{}, {"LR_STEP": [40, 60, 80]}],
+      [{}, {"LR_STEP": [20, 60]}],
+      [{}, {"LR_STEP": [10, 20, 30, 40]}],
+      [{}, {"LR_STEP": [1, 2, 3, 4, 5]}],
+      [{}, {"LR_STEP": [40, 80]}]
+    ],
+    "4": [
+      [{"SAT_FACTOR": 0.05}, {}],
+      [{"SAT_FACTOR": 0.1}, {}],
+      [{"SAT_FACTOR": 0.25}, {}],
+      [{"SAT_FACTOR": 0.35}, {}],
+      [{"SAT_FACTOR": 0.4}, {}],
+      [{"SAT_FACTOR": 0.5}, {}]
+    ]
+  }
+}

@@ -59,6 +59,7 @@ TRAIN:
   GAMMA2: 0.0
   MOMENTUM: 0.9
   NESTEROV: false
+  FREEZE_EPOCHS: 0
 TEST:
   BATCH_SIZE: 32
   COCO_BBOX_FILE: 'data/coco/person_detection_results/COCO_val2017_detections_AP_H_56_person.json'
@@ -76,3 +77,5 @@ DEBUG:
   SAVE_BATCH_IMAGES_PRED: true
   SAVE_HEATMAPS_GT: true
   SAVE_HEATMAPS_PRED: true
+CUDNN:
+  DETERMINISTIC: true
