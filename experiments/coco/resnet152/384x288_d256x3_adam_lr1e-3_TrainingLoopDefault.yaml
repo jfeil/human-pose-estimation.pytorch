@@ -70,6 +70,7 @@ TEST:
   MODEL_FILE: ''
   NMS_THRE: 1.0
   OKS_THRE: 0.9
+  BLUR_KERNEL: 11
   USE_GT_BBOX: true
 DEBUG:
   DEBUG: true

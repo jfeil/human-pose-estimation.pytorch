@@ -109,6 +109,7 @@ config.TEST.BATCH_SIZE = 32
 config.TEST.FLIP_TEST = False
 config.TEST.POST_PROCESS = True
 config.TEST.SHIFT_HEATMAP = True
+config.TEST.BLUR_KERNEL = 11
 
 config.TEST.USE_GT_BBOX = False
 # nms
