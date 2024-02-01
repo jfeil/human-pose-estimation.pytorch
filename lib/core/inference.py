@@ -88,7 +88,7 @@ def gaussian_blur(hm, kernel):
     return hm
 
 
-def get_final_preds(config, batch_heatmaps, center, scale, use_dark=False):
+def get_final_preds(config, batch_heatmaps, center, scale, use_dark=False, untransformed_coords=False):
     coords, maxvals = get_max_preds(batch_heatmaps)
 
     heatmap_height = batch_heatmaps.shape[2]
@@ -122,4 +122,7 @@ def get_final_preds(config, batch_heatmaps, center, scale, use_dark=False):
         preds[i] = transform_preds(coords[i], center[i], scale[i],
                                    [heatmap_width, heatmap_height])
 
-    return preds, maxvals
+    if untransformed_coords:
+        return preds, maxvals, coords
+    else:
+        return preds, maxvals
